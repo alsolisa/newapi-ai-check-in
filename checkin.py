@@ -1808,42 +1808,24 @@ class CheckIn:
                 except Exception:
                     await page.wait_for_timeout(3000)
 
-                # 关闭 User Agreement / 隐私协议弹窗 (如 n1n.ai)
+                # 关闭 User Agreement 弹窗 (n1n.ai 等站点)
                 try:
-                    # 方法1: 按文本查找
-                    for selector in [
-                        "text=Agree and continue",
-                        "button:has-text('Agree and continue')",
-                        "text=同意并继续",
-                        "button:has-text('同意')",
-                        "[class*='semi-button']:has-text('Agree')",
-                    ]:
-                        btn = page.locator(selector).first
-                        if await btn.count() > 0 and await btn.is_visible(timeout=2000):
-                            await btn.click(timeout=5000)
-                            await page.wait_for_timeout(1500)
-                            print(f"✅ {self.account_name}: Dismissed agreement modal via '{selector}'")
-                            break
-                except Exception:
-                    pass
-                
-                # 方法2: JS直接找按钮
-                try:
-                    dismissed = await page.evaluate("""() => {
-                        const btns = document.querySelectorAll('button, [role="button"]');
-                        for (const b of btns) {
-                            if (b.textContent.includes('Agree') || b.textContent.includes('同意')) {
-                                b.click();
-                                return true;
+                    await page.wait_for_timeout(2000)
+                    # JS暴力关闭: 遍历所有可见按钮找 Agree
+                    clicked = await page.evaluate("""() => {
+                        const all = document.querySelectorAll('button, [role="button"], .semi-button');
+                        for (const el of all) {
+                            if (el.textContent.includes('Agree') || el.textContent.includes('agree') || el.textContent.includes('同意')) {
+                                if (el.offsetParent !== null) { el.click(); return 'clicked: ' + el.textContent.trim(); }
                             }
                         }
-                        return false;
+                        return 'not found';
                     }""")
-                    if dismissed:
-                        await page.wait_for_timeout(1000)
-                        print(f"✅ {self.account_name}: Dismissed agreement modal via JS")
-                except Exception:
-                    pass
+                    print(f"ℹ️ {self.account_name}: Agreement JS result: {clicked}")
+                    if 'clicked' in str(clicked):
+                        await page.wait_for_timeout(1500)
+                except Exception as e:
+                    print(f"⚠️ {self.account_name}: Agreement dismiss failed: {e}")
 
                 if self.provider_config.aliyun_captcha:
                     await aliyun_captcha_check(page, self.account_name)
