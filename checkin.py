@@ -1782,6 +1782,16 @@ class CheckIn:
                 except Exception:
                     await page.wait_for_timeout(3000)
 
+                # 尝试关闭 User Agreement / 隐私协议弹窗 (如 n1n.ai)
+                try:
+                    agree_btn = page.locator("button:has-text('Agree'), button:has-text('同意'), button:has-text('accept'), [class*='agree'], [class*='Agree']").first
+                    if await agree_btn.is_visible(timeout=3000):
+                        await agree_btn.click()
+                        await page.wait_for_timeout(1000)
+                        print(f"✅ {self.account_name}: Dismissed agreement modal")
+                except Exception:
+                    pass
+
                 if self.provider_config.aliyun_captcha:
                     await aliyun_captcha_check(page, self.account_name)
 
