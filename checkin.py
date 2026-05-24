@@ -1734,6 +1734,32 @@ class CheckIn:
             if session:
                 session.close()
 
+        # 降级方案: 从 cookie / 页面元素 / 其他API提取用户ID
+        try:
+            page_cookies = await page.context.cookies()
+            for c in page_cookies:
+                if c.get("name") == "new-api-user":
+                    print(f"✅ {self.account_name}: Got api user from cookie 'new-api-user': {c['value']}")
+                    return c["value"]
+            api_user = await page.evaluate("""() => {
+                const user = localStorage.getItem('user');
+                if (user) { try { return JSON.parse(user).id; } catch(e) {} }
+                const u = localStorage.getItem('userInfo') || localStorage.getItem('user_info');
+                if (u) { try { return JSON.parse(u).id; } catch(e) {} }
+                for (let i=0; i<localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && k.toLowerCase().includes('user')) {
+                        try { const v = JSON.parse(localStorage.getItem(k)); if (v && v.id) return v.id; } catch(e) {}
+                    }
+                }
+                return null;
+            }""")
+            if api_user:
+                print(f"✅ {self.account_name}: Got api user from JS extraction: {api_user}")
+                return str(api_user)
+        except Exception as e:
+            print(f"⚠️ {self.account_name}: JS extraction failed: {e}")
+
         return None
 
     async def check_in_with_site_browser(
