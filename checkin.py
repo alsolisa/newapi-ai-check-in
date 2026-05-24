@@ -1782,13 +1782,40 @@ class CheckIn:
                 except Exception:
                     await page.wait_for_timeout(3000)
 
-                # 尝试关闭 User Agreement / 隐私协议弹窗 (如 n1n.ai)
+                # 关闭 User Agreement / 隐私协议弹窗 (如 n1n.ai)
                 try:
-                    agree_btn = page.locator("button:has-text('Agree'), button:has-text('同意'), button:has-text('accept'), [class*='agree'], [class*='Agree']").first
-                    if await agree_btn.is_visible(timeout=3000):
-                        await agree_btn.click()
+                    # 方法1: 按文本查找
+                    for selector in [
+                        "text=Agree and continue",
+                        "button:has-text('Agree and continue')",
+                        "text=同意并继续",
+                        "button:has-text('同意')",
+                        "[class*='semi-button']:has-text('Agree')",
+                    ]:
+                        btn = page.locator(selector).first
+                        if await btn.count() > 0 and await btn.is_visible(timeout=2000):
+                            await btn.click(timeout=5000)
+                            await page.wait_for_timeout(1500)
+                            print(f"✅ {self.account_name}: Dismissed agreement modal via '{selector}'")
+                            break
+                except Exception:
+                    pass
+                
+                # 方法2: JS直接找按钮
+                try:
+                    dismissed = await page.evaluate("""() => {
+                        const btns = document.querySelectorAll('button, [role="button"]');
+                        for (const b of btns) {
+                            if (b.textContent.includes('Agree') || b.textContent.includes('同意')) {
+                                b.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }""")
+                    if dismissed:
                         await page.wait_for_timeout(1000)
-                        print(f"✅ {self.account_name}: Dismissed agreement modal")
+                        print(f"✅ {self.account_name}: Dismissed agreement modal via JS")
                 except Exception:
                     pass
 
